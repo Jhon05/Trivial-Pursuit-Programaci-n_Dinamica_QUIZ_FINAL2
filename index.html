@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#061326" />
+  <title>Trivial Pursuit · Economía Matemática</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']], processEscapes: true },
+      svg: { fontCache: 'global' },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="alwaysClock" class="always-clock" aria-label="hora actual"><span class="clock-dot"></span><b id="alwaysClockText">--:--:--</b></div>
+  <section id="lockScreen" class="screen active">
+    <div class="splash-card">
+      <div class="menu-orb">☰</div>
+      <div class="gold-pill">Capítulo 12 · Optimización dinámica discreta</div>
+      <h1>TRIVIA QUEST<br><span>Programación Dinámica</span></h1>
+      <p class="lead">Tablero 3D tipo Trivial: seis quesos, caminos al centro, preguntas con \(\LaTeX\), selección de ruta después del dado y reto final en el centro.</p>
+      <div class="splash-grid">
+        <div class="glass-panel">
+          <h3>Clave docente</h3>
+          <p>Para iniciar la actividad, el docente debe ingresar la contraseña de acceso.</p>
+          <div class="input-line">
+            <input id="teacherPassword" type="password" placeholder="Clave docente" autocomplete="off" />
+            <button id="unlockBtn" class="btn gold">Entrar</button>
+          </div>
+          <div id="lockError" class="error"></div>
+        </div>
+        <div class="glass-panel math-cover latex">
+          \[J_s(x)=\max_{u\in U}\{f(s,x,u)+J_{s+1}(g(s,x,u))\}\]
+          \[H(t,x,u,p)=f(t,x,u)+p\,g(t,x,u)\]
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setupScreen" class="screen">
+    <div class="setup-card">
+      <header class="setup-header">
+        <div>
+          <div class="gold-pill">Configuración de partida</div>
+          <h2>Selecciona secciones y jugadores</h2>
+        </div>
+        <button id="backLockBtn" class="btn subtle">Volver</button>
+      </header>
+      <div class="setup-layout">
+        <div class="glass-panel">
+          <h3>Secciones disponibles</h3>
+          <div id="sectionChoices" class="checks"></div>
+          <p class="tiny">Las preguntas se generan por banco curado, con mayoría de ejercicios de cálculo y respuestas enteras cuando corresponda.</p>
+        </div>
+        <div class="glass-panel">
+          <h3>Jugadores</h3>
+          <label>Número de jugadores</label>
+          <select id="playerCount">
+            <option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+          </select>
+          <div id="playersConfig" class="players-config"></div>
+        </div>
+        <div class="glass-panel">
+          <h3>Modo</h3>
+          <label>Nivel</label>
+          <select id="levelSelect">
+            <option value="medio" selected>Medio · con pistas</option>
+            <option value="reto">Reto · más cálculo</option>
+            <option value="examen">Examen · sin pistas</option>
+          </select>
+          <label>Tiempo por tarjeta</label>
+          <select id="timeSelect">
+            <option value="0">Sin límite</option>
+            <option value="60">60 segundos</option>
+            <option value="90" selected>90 segundos</option>
+            <option value="120">120 segundos</option>
+          </select>
+          <div class="rule-card">Regla central: completa los <b>6 quesos</b>, regresa al <b>centro</b> y responde la pregunta final para ganar.</div>
+          <button id="startGameBtn" class="btn gold wide">Iniciar en pantalla completa</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main id="gameScreen" class="game hidden">
+    <header class="game-topbar compact">
+      <div class="mini-title">TRIVIAL PURSUIT · ECONOMÍA MATEMÁTICA</div>
+      <div class="top-actions" aria-label="controles de partida">
+        <button id="topFinishBtn" class="btn danger small">⚑ Finalizar partida</button>
+        <button id="topMainMenuBtn" class="btn subtle small">↩ Menú principal</button>
+        <button id="topTeacherWindowBtn" class="btn gold small">🔐 Ventana docente</button>
+      </div>
+    </header>
+
+    <div class="game-layout">
+      <section class="board-zone">
+        <div id="boardFrame" class="board-frame view-front">
+          <div id="boardScene" class="board-scene">
+            <svg id="pathLayer" class="path-layer" viewBox="0 0 1000 1000" aria-hidden="true"></svg>
+            <div id="board" class="board" aria-label="Tablero de juego"></div>
+            <div id="tokenLayer" class="token-layer"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <h2>Panel de juego</h2>
+        <div class="info-line"><span>Tiempo total</span><b id="totalTime">00:00</b></div>
+        <div class="info-line"><span>Modo</span><b id="modeInfo">partidas por secciones</b></div>
+        <div class="info-line"><span>Secciones</span><b id="sectionsPill">12.1–12.5</b></div>
+
+        <div id="playersPanel" class="players-panel"></div>
+
+        <div class="turn-card">
+          <h3>Control de turno</h3>
+          <p id="turnText">Jugador</p>
+          <div id="gameLog" class="log">Lanza el dado y luego elige una de las casillas iluminadas.</div>
+          <div class="dice-row">
+            <div id="dice" class="dice">?</div>
+            <button id="rollBtn" class="btn gold">🎲 Lanzar dado</button>
+          </div>
+          <div class="move-hint" id="moveHint">Después de lanzar se mostrarán todas las opciones posibles.</div>
+          <div class="view-controls">
+            <button id="frontViewBtn" class="btn subtle small selected">▣ Vista frontal</button>
+            <button id="threeDViewBtn" class="btn subtle small">◈ Vista 3D</button>
+            <button id="orbitViewBtn" class="btn subtle small">⟳ Giro 360°</button>
+          </div>
+          <div class="view-controls">
+            <button id="musicBtn" class="btn subtle small">♫ Música ON</button>
+            <button id="fxBtn" class="btn subtle small">🔊 FX: ON</button>
+          </div>
+          <button id="finishBtn" class="btn danger wide">⚑ Finalizar partida</button>
+          <button id="mainMenuBtn" class="btn subtle wide">↩ Regresar a menú principal</button>
+          <button id="teacherWindowBtn" class="btn gold wide">🔐 Ventana docente</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div id="questionModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="question-card">
+      <button id="closeQuestionBtn" class="xbtn" title="Cerrar" disabled>×</button>
+      <div class="q-head">
+        <div>
+          <div id="qSection" class="gold-pill">12.1</div>
+          <h2 id="qTitle">Tarjeta interactiva</h2>
+        </div>
+        <div class="timer-box">
+          <span>Tiempo por tarjeta</span>
+          <div class="timer-bar"><i id="timerFill"></i></div>
+          <b id="timer">--</b>
+        </div>
+      </div>
+      <div id="qPrompt" class="q-prompt latex"></div>
+      <div id="qBody" class="q-body"></div>
+      <div id="hintBox" class="hint-box hidden"></div>
+      <div id="feedback" class="feedback hidden"></div>
+      <div class="q-actions">
+        <button id="pauseBtn" class="btn subtle">⏸ Parar tiempo para hacer cuentas</button>
+        <button id="hintBtn" class="btn subtle">💡 Mostrar pista de esta pregunta</button>
+        <button id="submitBtn" class="btn gold">Enviar respuesta</button>
+        <button id="continueBtn" class="btn success hidden">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="reportModal" class="modal hidden">
+    <div class="report-card">
+      <div class="q-head"><h2>Reporte de partida</h2><button id="closeReportBtn" class="btn subtle small">Cerrar</button></div>
+      <div id="reportContent"></div>
+      <div class="q-actions"><button id="downloadPdfBtn" class="btn gold">Descargar PDF</button></div>
+    </div>
+  </div>
+
+  <div id="fullscreenBlock" class="fullscreen-block hidden">
+    <div class="fullscreen-box">
+      <div class="gold-pill">Modo seguro del quiz</div>
+      <h2>Pantalla completa requerida</h2>
+      <p>Durante la partida el juego debe permanecer en pantalla completa. Si se detectan intentos de salida, Escape, cambio de ventana, impresión, pantallazo, clic derecho, ver código fuente, inspección del navegador, uso de páginas externas o captura de pantalla desde el navegador, quedarán registrados en el informe.</p>
+      <button id="resumeFullscreenBtn" class="btn gold wide">Volver a pantalla completa</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
